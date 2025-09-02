@@ -1,0 +1,24 @@
+{
+  "name": "codershub_backend",
+  "version": "1.0.0",
+  "description": "CodersHub - Centralized. Accessible. Efficient. Academic Excellence Made Simple.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thecodersbu/codersHub_backend.git"
+  },
+  "keywords": [
+    "API"
+  ],
+  "author": "TCH",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/thecodersbu/codersHub_backend/issues"
+  },
+  "homepage": "https://github.com/thecodersbu/codersHub_backend#readme"
+}
