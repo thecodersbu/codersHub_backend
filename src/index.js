@@ -1,5 +1,22 @@
+import dotenv from "dotenv";
 import app from "./app.js";
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+import connectDB from "./config/database.js";
+
+dotenv.config({
+    path: "./.env",
 });
+
+const PORT = process.env.PORT || 5000;
+
+app.get("/user", (req, res) => {
+    res.send("hello world user");
+});
+connectDB()
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`Server is running on port http://localhost:${PORT}`);
+        });
+    })
+    .catch((err) => {
+        console.log("Error connecting to MongoDB:", err);
+    });

@@ -1,9 +1,29 @@
 import express from "express";
-import dotenv from "dotenv";
-import driverouter from "./routes/driveroute.js"; 
-dotenv.config();
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import healthCheckRouter from "./routes/healthcheck.routes.js";
+import resourceRouter from "./routes/resourceRoutes.js";
+
 const app = express();
 app.use(express.json());
-// Routes
-app.use("/drive", driverouter);
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static("public"));
+app.use(cookieParser());
+
+app.use(
+    cors({
+        origin: process.env.CORS_ORIGIN?.split(",") || "http://localhost:5173",
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+    }),
+);
+
+app.use("/api/v1/healthcheck", healthCheckRouter);
+app.use("/api/v1/resources", resourceRouter);
+
+app.get("/", (req, res) => {
+    res.send("hello world");
+});
+
 export default app;
