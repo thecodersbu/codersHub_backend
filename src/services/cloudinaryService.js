@@ -1,12 +1,8 @@
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { cloudConfig } from "../config/cloudConfig.js";
 import logger from "../utils/logger.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 let initialized = false;
 
@@ -110,12 +106,20 @@ export const uploadFile = async (
 
         const fileStats = await fs.promises.stat(filePath);
 
+        // Determine resource type based on mime type
+        let resourceType = "raw"; // Default for PDFs and other documents
+        if (mimeType.startsWith("image/")) {
+            resourceType = "image";
+        } else if (mimeType.startsWith("video/")) {
+            resourceType = "video";
+        }
+
         const uploadOptions = {
             folder: folderName,
             public_id:
                 options.publicId ||
                 path.parse(fileName).name + "_" + Date.now(),
-            resource_type: "auto", // Automatically detect resource type
+            resource_type: resourceType,
             use_filename: true,
             unique_filename: true,
             overwrite: false,
@@ -124,7 +128,9 @@ export const uploadFile = async (
             ...options,
         };
 
-        logger.info(`Uploading file: ${fileName} to folder: ${folderName}`);
+        logger.info(
+            `Uploading file: ${fileName} to folder: ${folderName} as ${resourceType}`,
+        );
 
         const response = await cloudinary.uploader.upload(
             filePath,
@@ -144,7 +150,9 @@ export const uploadFile = async (
             provider: "cloudinary",
         };
 
-        logger.info(`File uploaded successfully: ${fileName} (${result.id})`);
+        logger.info(
+            `File uploaded successfully: ${fileName} (${result.id}) as ${response.resource_type}`,
+        );
         return result;
     } catch (error) {
         logger.error(`Cloudinary upload failed: ${error.message}`);
@@ -156,16 +164,62 @@ export const deleteFile = async (publicId) => {
     try {
         if (!initialized) await initCloudinary();
 
-        const response = await cloudinary.uploader.destroy(publicId, {
-            resource_type: "auto",
-        });
+        // Try different resource types since PDFs can be stored as 'raw' or 'image'
+        const resourceTypes = ["raw", "image", "video"];
+        let deleteSuccess = false;
+        let lastError = null;
 
-        if (response.result === "ok" || response.result === "not found") {
-            logger.info(`File deleted successfully: ${publicId}`);
-            return true;
-        } else {
-            throw new Error(`Delete failed: ${response.result}`);
+        for (const resourceType of resourceTypes) {
+            try {
+                const response = await cloudinary.uploader.destroy(publicId, {
+                    resource_type: resourceType,
+                });
+
+                if (response.result === "ok") {
+                    logger.info(
+                        `File deleted successfully: ${publicId} (type: ${resourceType})`,
+                    );
+                    deleteSuccess = true;
+                    break;
+                } else if (response.result === "not found") {
+                    // Continue to next resource type
+                    continue;
+                }
+            } catch (error) {
+                lastError = error;
+                continue;
+            }
         }
+
+        if (!deleteSuccess) {
+            // If all resource types failed, try to get file info first to determine the correct type
+            try {
+                const fileInfo = await getFileInfo(publicId);
+                const response = await cloudinary.uploader.destroy(publicId, {
+                    resource_type: fileInfo.resourceType,
+                });
+
+                if (
+                    response.result === "ok" ||
+                    response.result === "not found"
+                ) {
+                    logger.info(
+                        `File deleted successfully: ${publicId} (type: ${fileInfo.resourceType})`,
+                    );
+                    return true;
+                }
+            } catch (infoError) {
+                logger.warn(
+                    `Could not get file info for ${publicId}: ${infoError.message}`,
+                );
+            }
+
+            throw new Error(
+                `Delete failed for all resource types. Last error: ${lastError?.message || "Unknown error"}`,
+            );
+        }
+
+        return true;
     } catch (error) {
         logger.error(`Delete failed for ${publicId}: ${error.message}`);
         throw new Error(`Failed to delete file: ${error.message}`);
@@ -176,9 +230,28 @@ export const getFileInfo = async (publicId) => {
     try {
         if (!initialized) await initCloudinary();
 
-        const response = await cloudinary.api.resource(publicId, {
-            resource_type: "auto",
-        });
+        // Try different resource types to find the file
+        const resourceTypes = ["raw", "image", "video"];
+        let response = null;
+        let lastError = null;
+
+        for (const resourceType of resourceTypes) {
+            try {
+                response = await cloudinary.api.resource(publicId, {
+                    resource_type: resourceType,
+                });
+                break; // Found the file
+            } catch (error) {
+                lastError = error;
+                continue;
+            }
+        }
+
+        if (!response) {
+            throw new Error(
+                `File not found in any resource type. Last error: ${lastError?.message || "Unknown error"}`,
+            );
+        }
 
         return {
             id: response.public_id,
@@ -204,27 +277,52 @@ export const listFiles = async (query = {}) => {
     try {
         if (!initialized) await initCloudinary();
 
-        const searchOptions = {
-            resource_type: "auto",
-            type: "upload",
-            max_results: query.limit || 100,
-            next_cursor: query.nextCursor,
-            prefix: folderName ? `${folderName}/` : undefined,
-        };
+        // Since we primarily upload PDFs, try 'raw' first, then other types
+        const resourceTypes = ["raw", "image", "video"];
+        let allResources = [];
 
-        const response = await cloudinary.api.resources(searchOptions);
+        for (const resourceType of resourceTypes) {
+            try {
+                const searchOptions = {
+                    resource_type: resourceType,
+                    type: "upload",
+                    max_results: query.limit || 100,
+                    next_cursor: query.nextCursor,
+                    prefix: folderName ? `${folderName}/` : undefined,
+                };
 
-        return response.resources.map((resource) => ({
-            id: resource.public_id,
-            name: resource.public_id.split("/").pop(),
-            size: resource.bytes,
-            format: resource.format,
-            createdAt: resource.created_at,
-            url: resource.secure_url,
-            resourceType: resource.resource_type,
-            context: resource.context,
-            tags: resource.tags,
-        }));
+                const response = await cloudinary.api.resources(searchOptions);
+
+                const resources = response.resources.map((resource) => ({
+                    id: resource.public_id,
+                    name: resource.public_id.split("/").pop(),
+                    size: resource.bytes,
+                    format: resource.format,
+                    createdAt: resource.created_at,
+                    url: resource.secure_url,
+                    resourceType: resource.resource_type,
+                    context: resource.context,
+                    tags: resource.tags,
+                }));
+
+                allResources = allResources.concat(resources);
+            } catch (error) {
+                logger.warn(
+                    `List files failed for resource type ${resourceType}: ${error.message}`,
+                );
+                continue;
+            }
+        }
+
+        // Remove duplicates and sort by creation date
+        const uniqueResources = allResources
+            .filter(
+                (resource, index, self) =>
+                    index === self.findIndex((r) => r.id === resource.id),
+            )
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        return uniqueResources;
     } catch (error) {
         logger.error(`List files failed: ${error.message}`);
         throw new Error(`Failed to list files: ${error.message}`);
@@ -303,12 +401,43 @@ export const bulkDelete = async (publicIds) => {
     try {
         if (!initialized) await initCloudinary();
 
-        const response = await cloudinary.api.delete_resources(publicIds, {
-            resource_type: "auto",
-        });
+        // Try different resource types for bulk delete
+        const resourceTypes = ["raw", "image", "video"];
+        let successCount = 0;
+        const results = {};
 
-        logger.info(`Bulk delete completed for ${publicIds.length} files`);
-        return response;
+        for (const resourceType of resourceTypes) {
+            try {
+                const response = await cloudinary.api.delete_resources(
+                    publicIds,
+                    {
+                        resource_type: resourceType,
+                    },
+                );
+
+                // Count successful deletions
+                Object.keys(response.deleted || {}).forEach((id) => {
+                    if (response.deleted[id] === "deleted") {
+                        successCount++;
+                        results[id] = "deleted";
+                    }
+                });
+
+                logger.info(
+                    `Bulk delete for resource type ${resourceType}: ${Object.keys(response.deleted || {}).length} files processed`,
+                );
+            } catch (error) {
+                logger.warn(
+                    `Bulk delete failed for resource type ${resourceType}: ${error.message}`,
+                );
+                continue;
+            }
+        }
+
+        logger.info(
+            `Bulk delete completed: ${successCount} files deleted successfully`,
+        );
+        return { deleted: results, deletedCount: successCount };
     } catch (error) {
         logger.error(`Bulk delete failed: ${error.message}`);
         throw new Error(`Failed to bulk delete files: ${error.message}`);

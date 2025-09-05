@@ -11,17 +11,13 @@ import {
     bulkDelete,
     initCloudinary,
 } from "../services/cloudinaryService.js";
+import { Resource } from "../models/Resource.js";
 import logger from "../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const mockDatabase = {
-    resources: [],
-    nextId: 1,
-};
-
-export const uploadResource = async (req, res) => {
+export const uploadPYQ = async (req, res) => {
     const uploadedFile = req.file;
 
     try {
@@ -34,17 +30,8 @@ export const uploadResource = async (req, res) => {
 
         await initCloudinary();
 
-        const {
-            branch,
-            semester,
-            subject,
-            resourceType,
-            title,
-            description,
-            syllabusText,
-            contentLink,
-            tags,
-        } = req.body;
+        const { branch, semester, subject, title, description, tags } =
+            req.body;
 
         const parsedTags = tags ? tags.split(",").map((tag) => tag.trim()) : [];
 
@@ -53,11 +40,11 @@ export const uploadResource = async (req, res) => {
                 branch,
                 semester: parseInt(semester),
                 subject,
-                resourceType,
+                resourceType: "pyq",
                 title,
                 description: description || "",
             },
-            tags: [branch, `semester_${semester}`, resourceType, ...parsedTags],
+            tags: [branch, `semester_${semester}`, "pyq", ...parsedTags],
         };
 
         const cloudinaryResult = await uploadFile(
@@ -67,34 +54,22 @@ export const uploadResource = async (req, res) => {
             uploadOptions,
         );
 
-        const resource = {
-            id: mockDatabase.nextId++,
+        const resource = new Resource({
             branch,
             semester: parseInt(semester),
             subject,
-            resourceType,
+            resourceType: "pyq",
             title,
             description: description || null,
-            syllabusText: syllabusText || null,
-            contentLink: contentLink || null,
             tags: parsedTags,
-            fileInfo: {
-                originalName: uploadedFile.originalname,
-                mimeType: uploadedFile.mimetype,
-                size: uploadedFile.size,
-                cloudinaryId: cloudinaryResult.id,
-                cloudinaryUrl: cloudinaryResult.url,
-                viewUrl: cloudinaryResult.viewUrl,
-                format: cloudinaryResult.format,
-                resourceType: cloudinaryResult.resourceType,
-                version: cloudinaryResult.version,
-            },
-            uploadedAt: new Date(),
-            downloadCount: 0,
-            lastAccessed: null,
-        };
+            fileUrl: cloudinaryResult.url,
+            fileId: cloudinaryResult.id,
+            fileName: uploadedFile.originalname,
+            fileSize: uploadedFile.size,
+            uploadedBy: "admin", // You can modify this based on authentication
+        });
 
-        mockDatabase.resources.push(resource);
+        await resource.save();
 
         try {
             await fs.promises.unlink(uploadedFile.path);
@@ -106,14 +81,14 @@ export const uploadResource = async (req, res) => {
         }
 
         logger.info(
-            `Resource uploaded successfully: ${title} (ID: ${resource.id})`,
+            `PYQ uploaded successfully: ${title} (ID: ${resource._id})`,
         );
 
         res.status(201).json({
             success: true,
-            message: "Resource uploaded successfully",
+            message: "PYQ uploaded successfully",
             resource: {
-                id: resource.id,
+                id: resource._id,
                 title: resource.title,
                 branch: resource.branch,
                 semester: resource.semester,
@@ -121,18 +96,13 @@ export const uploadResource = async (req, res) => {
                 resourceType: resource.resourceType,
                 description: resource.description,
                 tags: resource.tags,
-                uploadedAt: resource.uploadedAt,
+                fileUrl: resource.fileUrl,
+                uploadedAt: resource.createdAt,
                 downloadCount: resource.downloadCount,
-                fileInfo: {
-                    originalName: resource.fileInfo.originalName,
-                    size: resource.fileInfo.size,
-                    viewUrl: resource.fileInfo.viewUrl,
-                    format: resource.fileInfo.format,
-                },
             },
         });
     } catch (error) {
-        logger.error(`Resource upload failed: ${error.message}`);
+        logger.error(`PYQ upload failed: ${error.message}`);
 
         if (uploadedFile && uploadedFile.path) {
             try {
@@ -146,7 +116,244 @@ export const uploadResource = async (req, res) => {
 
         res.status(500).json({
             success: false,
-            message: "Failed to upload resource",
+            message: "Failed to upload PYQ",
+            error: error.message,
+        });
+    }
+};
+
+export const uploadNotes = async (req, res) => {
+    const uploadedFile = req.file;
+
+    try {
+        if (!uploadedFile) {
+            return res.status(400).json({
+                success: false,
+                message: "No file uploaded",
+            });
+        }
+
+        await initCloudinary();
+
+        const { branch, semester, subject, title, description, tags } =
+            req.body;
+
+        const parsedTags = tags ? tags.split(",").map((tag) => tag.trim()) : [];
+
+        const uploadOptions = {
+            context: {
+                branch,
+                semester: parseInt(semester),
+                subject,
+                resourceType: "notes",
+                title,
+                description: description || "",
+            },
+            tags: [branch, `semester_${semester}`, "notes", ...parsedTags],
+        };
+
+        const cloudinaryResult = await uploadFile(
+            uploadedFile.path,
+            uploadedFile.originalname,
+            uploadedFile.mimetype,
+            uploadOptions,
+        );
+
+        const resource = new Resource({
+            branch,
+            semester: parseInt(semester),
+            subject,
+            resourceType: "notes",
+            title,
+            description: description || null,
+            tags: parsedTags,
+            fileUrl: cloudinaryResult.url,
+            fileId: cloudinaryResult.id,
+            fileName: uploadedFile.originalname,
+            fileSize: uploadedFile.size,
+            uploadedBy: "admin",
+        });
+
+        await resource.save();
+
+        try {
+            await fs.promises.unlink(uploadedFile.path);
+            logger.info(`Local file cleaned up: ${uploadedFile.path}`);
+        } catch (cleanupError) {
+            logger.warn(
+                `Failed to cleanup local file: ${cleanupError.message}`,
+            );
+        }
+
+        logger.info(
+            `Notes uploaded successfully: ${title} (ID: ${resource._id})`,
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "Notes uploaded successfully",
+            resource: {
+                id: resource._id,
+                title: resource.title,
+                branch: resource.branch,
+                semester: resource.semester,
+                subject: resource.subject,
+                resourceType: resource.resourceType,
+                description: resource.description,
+                tags: resource.tags,
+                fileUrl: resource.fileUrl,
+                uploadedAt: resource.createdAt,
+                downloadCount: resource.downloadCount,
+            },
+        });
+    } catch (error) {
+        logger.error(`Notes upload failed: ${error.message}`);
+
+        if (uploadedFile && uploadedFile.path) {
+            try {
+                await fs.promises.unlink(uploadedFile.path);
+            } catch (cleanupError) {
+                logger.warn(
+                    `Failed to cleanup file after error: ${cleanupError.message}`,
+                );
+            }
+        }
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to upload notes",
+            error: error.message,
+        });
+    }
+};
+
+export const uploadSyllabus = async (req, res) => {
+    try {
+        const {
+            branch,
+            semester,
+            subject,
+            title,
+            description,
+            syllabusText,
+            tags,
+        } = req.body;
+
+        if (!syllabusText || syllabusText.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Syllabus text is required",
+            });
+        }
+
+        const parsedTags = tags ? tags.split(",").map((tag) => tag.trim()) : [];
+
+        const resource = new Resource({
+            branch,
+            semester: parseInt(semester),
+            subject,
+            resourceType: "syllabus",
+            title,
+            description: description || null,
+            syllabusText,
+            tags: parsedTags,
+            uploadedBy: "admin",
+        });
+
+        await resource.save();
+
+        logger.info(
+            `Syllabus uploaded successfully: ${title} (ID: ${resource._id})`,
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "Syllabus uploaded successfully",
+            resource: {
+                id: resource._id,
+                title: resource.title,
+                branch: resource.branch,
+                semester: resource.semester,
+                subject: resource.subject,
+                resourceType: resource.resourceType,
+                description: resource.description,
+                syllabusText: resource.syllabusText,
+                tags: resource.tags,
+                uploadedAt: resource.createdAt,
+                downloadCount: resource.downloadCount,
+            },
+        });
+    } catch (error) {
+        logger.error(`Syllabus upload failed: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: "Failed to upload syllabus",
+            error: error.message,
+        });
+    }
+};
+
+export const uploadContentLink = async (req, res) => {
+    try {
+        const {
+            branch,
+            semester,
+            subject,
+            title,
+            description,
+            contentLink,
+            tags,
+        } = req.body;
+
+        if (!contentLink || !contentLink.match(/^https?:\/\/.+/)) {
+            return res.status(400).json({
+                success: false,
+                message: "Valid content link URL is required",
+            });
+        }
+
+        const parsedTags = tags ? tags.split(",").map((tag) => tag.trim()) : [];
+
+        const resource = new Resource({
+            branch,
+            semester: parseInt(semester),
+            subject,
+            resourceType: "content",
+            title,
+            description: description || null,
+            contentLink,
+            tags: parsedTags,
+            uploadedBy: "admin",
+        });
+
+        await resource.save();
+
+        logger.info(
+            `Content link uploaded successfully: ${title} (ID: ${resource._id})`,
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "Content link uploaded successfully",
+            resource: {
+                id: resource._id,
+                title: resource.title,
+                branch: resource.branch,
+                semester: resource.semester,
+                subject: resource.subject,
+                resourceType: resource.resourceType,
+                description: resource.description,
+                contentLink: resource.contentLink,
+                tags: resource.tags,
+                uploadedAt: resource.createdAt,
+                downloadCount: resource.downloadCount,
+            },
+        });
+    } catch (error) {
+        logger.error(`Content link upload failed: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: "Failed to upload content link",
             error: error.message,
         });
     }
@@ -162,72 +369,41 @@ export const getResources = async (req, res) => {
             search,
             page = 1,
             limit = 20,
-            sortBy = "uploadedAt",
+            sortBy = "createdAt",
             sortOrder = "desc",
         } = req.query;
 
-        let filteredResources = [...mockDatabase.resources];
+        const query = { isActive: true };
 
-        if (branch) {
-            filteredResources = filteredResources.filter(
-                (r) => r.branch === branch,
-            );
-        }
-        if (semester) {
-            filteredResources = filteredResources.filter(
-                (r) => r.semester === parseInt(semester),
-            );
-        }
-        if (subject) {
-            filteredResources = filteredResources.filter((r) =>
-                r.subject.toLowerCase().includes(subject.toLowerCase()),
-            );
-        }
-        if (resourceType) {
-            filteredResources = filteredResources.filter(
-                (r) => r.resourceType === resourceType,
-            );
-        }
+        if (branch) query.branch = branch;
+        if (semester) query.semester = parseInt(semester);
+        if (subject) query.subject = new RegExp(subject, "i");
+        if (resourceType) query.resourceType = resourceType;
+
         if (search) {
-            const searchTerm = search.toLowerCase();
-            filteredResources = filteredResources.filter(
-                (r) =>
-                    r.title.toLowerCase().includes(searchTerm) ||
-                    r.description?.toLowerCase().includes(searchTerm) ||
-                    r.subject.toLowerCase().includes(searchTerm) ||
-                    r.tags.some((tag) =>
-                        tag.toLowerCase().includes(searchTerm),
-                    ),
-            );
+            query.$or = [
+                { title: new RegExp(search, "i") },
+                { description: new RegExp(search, "i") },
+                { subject: new RegExp(search, "i") },
+                { tags: { $in: [new RegExp(search, "i")] } },
+                { syllabusText: new RegExp(search, "i") },
+            ];
         }
-
-        filteredResources.sort((a, b) => {
-            let aValue = a[sortBy];
-            let bValue = b[sortBy];
-
-            if (sortBy === "uploadedAt" || sortBy === "lastAccessed") {
-                aValue = new Date(aValue);
-                bValue = new Date(bValue);
-            }
-
-            if (sortOrder === "asc") {
-                return aValue > bValue ? 1 : -1;
-            } else {
-                return aValue < bValue ? 1 : -1;
-            }
-        });
 
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
-        const startIndex = (pageNum - 1) * limitNum;
-        const endIndex = startIndex + limitNum;
-        const paginatedResources = filteredResources.slice(
-            startIndex,
-            endIndex,
-        );
+        const skip = (pageNum - 1) * limitNum;
 
-        const formattedResources = paginatedResources.map((resource) => ({
-            id: resource.id,
+        const sort = {};
+        sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+        const [resources, totalCount] = await Promise.all([
+            Resource.find(query).sort(sort).skip(skip).limit(limitNum).lean(),
+            Resource.countDocuments(query),
+        ]);
+
+        const formattedResources = resources.map((resource) => ({
+            id: resource._id,
             title: resource.title,
             branch: resource.branch,
             semester: resource.semester,
@@ -235,16 +411,17 @@ export const getResources = async (req, res) => {
             resourceType: resource.resourceType,
             description: resource.description,
             tags: resource.tags,
-            uploadedAt: resource.uploadedAt,
+            uploadedAt: resource.createdAt,
             downloadCount: resource.downloadCount,
-            lastAccessed: resource.lastAccessed,
-            fileInfo: {
-                originalName: resource.fileInfo.originalName,
-                size: resource.fileInfo.size,
-                viewUrl: resource.fileInfo.viewUrl,
-                format: resource.fileInfo.format,
-            },
+            fileUrl: resource.fileUrl,
+            fileId: resource.fileId,
+            fileName: resource.fileName,
+            fileSize: resource.fileSize,
+            syllabusText: resource.syllabusText,
+            contentLink: resource.contentLink,
         }));
+
+        const totalPages = Math.ceil(totalCount / limitNum);
 
         res.json({
             success: true,
@@ -253,10 +430,10 @@ export const getResources = async (req, res) => {
                 resources: formattedResources,
                 pagination: {
                     currentPage: pageNum,
-                    totalPages: Math.ceil(filteredResources.length / limitNum),
-                    totalItems: filteredResources.length,
+                    totalPages,
+                    totalItems: totalCount,
                     itemsPerPage: limitNum,
-                    hasNextPage: endIndex < filteredResources.length,
+                    hasNextPage: pageNum < totalPages,
                     hasPreviousPage: pageNum > 1,
                 },
                 filters: {
@@ -297,72 +474,62 @@ export const searchResources = async (req, res) => {
             limit = 20,
         } = req.query;
 
-        let expression = "";
+        const query = { isActive: true };
 
-        expression += "folder:campushub-resources";
+        if (branch) query.branch = branch;
+        if (semester) query.semester = parseInt(semester);
+        if (resourceType) query.resourceType = resourceType;
 
         if (searchQuery) {
-            expression += ` AND (filename:*${searchQuery}* OR context.title:*${searchQuery}* OR context.description:*${searchQuery}*)`;
+            query.$text = { $search: searchQuery };
         }
-
-        if (branch) {
-            expression += ` AND tags:${branch}`;
-        }
-
-        if (semester) {
-            expression += ` AND tags:semester_${semester}`;
-        }
-
-        if (resourceType) {
-            expression += ` AND tags:${resourceType}`;
-        }
-
-        await initCloudinary();
-        const cloudinaryResults = await searchFiles(expression, {
-            limit: parseInt(limit),
-            sortBy: "created_at",
-            sortOrder: "desc",
-        });
-
-        const matchedResources = mockDatabase.resources.filter((resource) =>
-            cloudinaryResults.resources.some(
-                (cloudResource) =>
-                    cloudResource.id === resource.fileInfo.cloudinaryId,
-            ),
-        );
 
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
-        const startIndex = (pageNum - 1) * limitNum;
-        const endIndex = startIndex + limitNum;
-        const paginatedResources = matchedResources.slice(startIndex, endIndex);
+        const skip = (pageNum - 1) * limitNum;
+
+        const [resources, totalCount] = await Promise.all([
+            Resource.find(query)
+                .sort(
+                    searchQuery
+                        ? { score: { $meta: "textScore" } }
+                        : { createdAt: -1 },
+                )
+                .skip(skip)
+                .limit(limitNum)
+                .lean(),
+            Resource.countDocuments(query),
+        ]);
+
+        const formattedResources = resources.map((resource) => ({
+            id: resource._id,
+            title: resource.title,
+            branch: resource.branch,
+            semester: resource.semester,
+            subject: resource.subject,
+            resourceType: resource.resourceType,
+            description: resource.description,
+            tags: resource.tags,
+            uploadedAt: resource.createdAt,
+            downloadCount: resource.downloadCount,
+            fileUrl: resource.fileUrl,
+            fileName: resource.fileName,
+            fileSize: resource.fileSize,
+            syllabusText: resource.syllabusText,
+            contentLink: resource.contentLink,
+        }));
+
+        const totalPages = Math.ceil(totalCount / limitNum);
 
         res.json({
             success: true,
             message: "Search completed successfully",
             data: {
-                resources: paginatedResources.map((resource) => ({
-                    id: resource.id,
-                    title: resource.title,
-                    branch: resource.branch,
-                    semester: resource.semester,
-                    subject: resource.subject,
-                    resourceType: resource.resourceType,
-                    description: resource.description,
-                    tags: resource.tags,
-                    uploadedAt: resource.uploadedAt,
-                    downloadCount: resource.downloadCount,
-                    fileInfo: {
-                        originalName: resource.fileInfo.originalName,
-                        size: resource.fileInfo.size,
-                        viewUrl: resource.fileInfo.viewUrl,
-                        format: resource.fileInfo.format,
-                    },
-                })),
+                resources: formattedResources,
                 pagination: {
                     currentPage: pageNum,
-                    totalPages: Math.ceil(matchedResources.length / limitNum),
-                    totalItems: matchedResources.length,
+                    totalPages,
+                    totalItems: totalCount,
                     itemsPerPage: limitNum,
                 },
                 searchQuery,
@@ -382,11 +549,8 @@ export const searchResources = async (req, res) => {
 export const getResourceById = async (req, res) => {
     try {
         const { id } = req.params;
-        const resourceId = parseInt(id);
 
-        const resource = mockDatabase.resources.find(
-            (r) => r.id === resourceId,
-        );
+        const resource = await Resource.findById(id);
 
         if (!resource) {
             return res.status(404).json({
@@ -395,25 +559,23 @@ export const getResourceById = async (req, res) => {
             });
         }
 
-        resource.lastAccessed = new Date();
-
         let cloudinaryFileInfo = null;
-        try {
-            await initCloudinary();
-            cloudinaryFileInfo = await getFileInfo(
-                resource.fileInfo.cloudinaryId,
-            );
-        } catch (cloudinaryError) {
-            logger.warn(
-                `Failed to get Cloudinary file info: ${cloudinaryError.message}`,
-            );
+        if (resource.fileId) {
+            try {
+                await initCloudinary();
+                cloudinaryFileInfo = await getFileInfo(resource.fileId);
+            } catch (cloudinaryError) {
+                logger.warn(
+                    `Failed to get Cloudinary file info: ${cloudinaryError.message}`,
+                );
+            }
         }
 
         res.json({
             success: true,
             message: "Resource retrieved successfully",
             resource: {
-                id: resource.id,
+                id: resource._id,
                 title: resource.title,
                 branch: resource.branch,
                 semester: resource.semester,
@@ -423,26 +585,17 @@ export const getResourceById = async (req, res) => {
                 syllabusText: resource.syllabusText,
                 contentLink: resource.contentLink,
                 tags: resource.tags,
-                uploadedAt: resource.uploadedAt,
+                uploadedAt: resource.createdAt,
                 downloadCount: resource.downloadCount,
-                lastAccessed: resource.lastAccessed,
-                fileInfo: {
-                    originalName: resource.fileInfo.originalName,
-                    mimeType: resource.fileInfo.mimeType,
-                    size: resource.fileInfo.size,
-                    cloudinaryId: resource.fileInfo.cloudinaryId,
-                    cloudinaryUrl: resource.fileInfo.cloudinaryUrl,
-                    viewUrl: resource.fileInfo.viewUrl,
-                    format: resource.fileInfo.format,
-                    version: resource.fileInfo.version,
-                    cloudinaryFileInfo: cloudinaryFileInfo,
-                },
+                fileUrl: resource.fileUrl,
+                fileId: resource.fileId,
+                fileName: resource.fileName,
+                fileSize: resource.fileSize,
+                cloudinaryFileInfo: cloudinaryFileInfo,
             },
         });
 
-        logger.info(
-            `Resource retrieved: ${resource.title} (ID: ${resourceId})`,
-        );
+        logger.info(`Resource retrieved: ${resource.title} (ID: ${id})`);
     } catch (error) {
         logger.error(`Failed to retrieve resource: ${error.message}`);
         res.status(500).json({
@@ -456,11 +609,8 @@ export const getResourceById = async (req, res) => {
 export const downloadResource = async (req, res) => {
     try {
         const { id } = req.params;
-        const resourceId = parseInt(id);
 
-        const resource = mockDatabase.resources.find(
-            (r) => r.id === resourceId,
-        );
+        const resource = await Resource.findById(id);
 
         if (!resource) {
             return res.status(404).json({
@@ -469,27 +619,58 @@ export const downloadResource = async (req, res) => {
             });
         }
 
-        resource.downloadCount++;
-        resource.lastAccessed = new Date();
+        resource.downloadCount += 1;
+        await resource.save();
 
-        res.json({
-            success: true,
-            message: "Download link retrieved successfully",
-            download: {
-                resourceId: resource.id,
-                title: resource.title,
-                fileName: resource.fileInfo.originalName,
-                downloadUrl: resource.fileInfo.cloudinaryUrl,
-                viewUrl: resource.fileInfo.viewUrl,
-                size: resource.fileInfo.size,
-                mimeType: resource.fileInfo.mimeType,
-                format: resource.fileInfo.format,
-                downloadCount: resource.downloadCount,
-            },
-        });
+        if (resource.resourceType === "syllabus") {
+            res.json({
+                success: true,
+                message: "Syllabus content retrieved successfully",
+                download: {
+                    resourceId: resource._id,
+                    title: resource.title,
+                    resourceType: resource.resourceType,
+                    syllabusText: resource.syllabusText,
+                    downloadCount: resource.downloadCount,
+                },
+            });
+        } else if (resource.resourceType === "content") {
+            res.json({
+                success: true,
+                message: "Content link retrieved successfully",
+                download: {
+                    resourceId: resource._id,
+                    title: resource.title,
+                    resourceType: resource.resourceType,
+                    contentLink: resource.contentLink,
+                    downloadCount: resource.downloadCount,
+                },
+            });
+        } else {
+            if (!resource.fileUrl) {
+                return res.status(404).json({
+                    success: false,
+                    message: "File not found for this resource",
+                });
+            }
+
+            res.json({
+                success: true,
+                message: "Download link retrieved successfully",
+                download: {
+                    resourceId: resource._id,
+                    title: resource.title,
+                    fileName: resource.fileName,
+                    downloadUrl: resource.fileUrl,
+                    size: resource.fileSize,
+                    resourceType: resource.resourceType,
+                    downloadCount: resource.downloadCount,
+                },
+            });
+        }
 
         logger.info(
-            `Download initiated for resource: ${resource.title} (ID: ${resourceId})`,
+            `Download initiated for resource: ${resource.title} (ID: ${id})`,
         );
     } catch (error) {
         logger.error(`Failed to process download: ${error.message}`);
@@ -504,47 +685,43 @@ export const downloadResource = async (req, res) => {
 export const deleteResource = async (req, res) => {
     try {
         const { id } = req.params;
-        const resourceId = parseInt(id);
 
-        const resourceIndex = mockDatabase.resources.findIndex(
-            (r) => r.id === resourceId,
-        );
+        const resource = await Resource.findById(id);
 
-        if (resourceIndex === -1) {
+        if (!resource) {
             return res.status(404).json({
                 success: false,
                 message: "Resource not found",
             });
         }
 
-        const resource = mockDatabase.resources[resourceIndex];
-
-        try {
-            await initCloudinary();
-            await deleteFile(resource.fileInfo.cloudinaryId);
-            logger.info(
-                `File deleted from Cloudinary: ${resource.fileInfo.cloudinaryId}`,
-            );
-        } catch (cloudinaryError) {
-            logger.warn(
-                `Failed to delete from Cloudinary: ${cloudinaryError.message}`,
-            );
+        if (resource.fileId) {
+            try {
+                await initCloudinary();
+                await deleteFile(resource.fileId);
+                logger.info(`File deleted from Cloudinary: ${resource.fileId}`);
+            } catch (cloudinaryError) {
+                logger.warn(
+                    `Failed to delete from Cloudinary: ${cloudinaryError.message}`,
+                );
+            }
         }
 
-        mockDatabase.resources.splice(resourceIndex, 1);
+        await Resource.findByIdAndDelete(id);
 
         res.json({
             success: true,
             message: "Resource deleted successfully",
             deletedResource: {
-                id: resource.id,
+                id: resource._id,
                 title: resource.title,
-                fileName: resource.fileInfo.originalName,
+                fileName: resource.fileName,
+                resourceType: resource.resourceType,
             },
         });
 
         logger.info(
-            `Resource deleted successfully: ${resource.title} (ID: ${resourceId})`,
+            `Resource deleted successfully: ${resource.title} (ID: ${id})`,
         );
     } catch (error) {
         logger.error(`Failed to delete resource: ${error.message}`);
@@ -560,9 +737,10 @@ export const bulkDeleteResources = async (req, res) => {
     try {
         const { resourceIds } = req.body;
 
-        const resourcesToDelete = mockDatabase.resources.filter((r) =>
-            resourceIds.includes(r.id.toString()),
-        );
+        const resourcesToDelete = await Resource.find({
+            _id: { $in: resourceIds },
+            isActive: true,
+        });
 
         if (resourcesToDelete.length === 0) {
             return res.status(404).json({
@@ -571,34 +749,35 @@ export const bulkDeleteResources = async (req, res) => {
             });
         }
 
-        const cloudinaryIds = resourcesToDelete.map(
-            (r) => r.fileInfo.cloudinaryId,
-        );
+        const cloudinaryIds = resourcesToDelete
+            .filter((r) => r.fileId)
+            .map((r) => r.fileId);
 
-        try {
-            await initCloudinary();
-            await bulkDelete(cloudinaryIds);
-            logger.info(
-                `Bulk deleted ${cloudinaryIds.length} files from Cloudinary`,
-            );
-        } catch (cloudinaryError) {
-            logger.warn(
-                `Failed to bulk delete from Cloudinary: ${cloudinaryError.message}`,
-            );
+        if (cloudinaryIds.length > 0) {
+            try {
+                await initCloudinary();
+                await bulkDelete(cloudinaryIds);
+                logger.info(
+                    `Bulk deleted ${cloudinaryIds.length} files from Cloudinary`,
+                );
+            } catch (cloudinaryError) {
+                logger.warn(
+                    `Failed to bulk delete from Cloudinary: ${cloudinaryError.message}`,
+                );
+            }
         }
 
-        mockDatabase.resources = mockDatabase.resources.filter(
-            (r) => !resourceIds.includes(r.id.toString()),
-        );
+        await Resource.deleteMany({ _id: { $in: resourceIds } });
 
         res.json({
             success: true,
             message: `Successfully deleted ${resourcesToDelete.length} resources`,
             deletedCount: resourcesToDelete.length,
             deletedResources: resourcesToDelete.map((r) => ({
-                id: r.id,
+                id: r._id,
                 title: r.title,
-                fileName: r.fileInfo.originalName,
+                fileName: r.fileName,
+                resourceType: r.resourceType,
             })),
         });
 
@@ -617,7 +796,7 @@ export const bulkDeleteResources = async (req, res) => {
 
 export const getResourceStats = async (req, res) => {
     try {
-        const resources = mockDatabase.resources;
+        const resources = await Resource.find({ isActive: true });
 
         const totalResources = resources.length;
         const totalDownloads = resources.reduce(
@@ -625,7 +804,7 @@ export const getResourceStats = async (req, res) => {
             0,
         );
         const totalSize = resources.reduce(
-            (sum, r) => sum + r.fileInfo.size,
+            (sum, r) => sum + (r.fileSize || 0),
             0,
         );
 
@@ -660,7 +839,7 @@ export const getResourceStats = async (req, res) => {
             .sort((a, b) => b.downloadCount - a.downloadCount)
             .slice(0, 10)
             .map((r) => ({
-                id: r.id,
+                id: r._id,
                 title: r.title,
                 branch: r.branch,
                 semester: r.semester,
@@ -669,15 +848,15 @@ export const getResourceStats = async (req, res) => {
             }));
 
         const recentUploads = resources
-            .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
             .slice(0, 10)
             .map((r) => ({
-                id: r.id,
+                id: r._id,
                 title: r.title,
                 branch: r.branch,
                 semester: r.semester,
                 resourceType: r.resourceType,
-                uploadedAt: r.uploadedAt,
+                uploadedAt: r.createdAt,
             }));
 
         let storageInfo = null;
@@ -738,19 +917,27 @@ export const getBranches = async (req, res) => {
             { code: "BT", name: "Biotechnology" },
             { code: "BM", name: "Biomedical Engineering" },
             { code: "FT", name: "Food Technology" },
-            { code: "EIE", name: "Electronics and Instrumentation Engineering" },
             {
-                code: "IT",
-                name: "Information Technology",
+                code: "EIE",
+                name: "Electronics and Instrumentation Engineering",
             },
+            { code: "IT", name: "Information Technology" },
         ];
 
-        const branchesWithCounts = branches.map((branch) => {
-            const count = mockDatabase.resources.filter(
-                (r) => r.branch === branch.code,
-            ).length;
-            return { ...branch, resourceCount: count };
+        const branchCounts = await Resource.aggregate([
+            { $match: { isActive: true } },
+            { $group: { _id: "$branch", count: { $sum: 1 } } },
+        ]);
+
+        const branchCountMap = {};
+        branchCounts.forEach((item) => {
+            branchCountMap[item._id] = item.count;
         });
+
+        const branchesWithCounts = branches.map((branch) => ({
+            ...branch,
+            resourceCount: branchCountMap[branch.code] || 0,
+        }));
 
         res.json({
             success: true,
@@ -773,50 +960,35 @@ export const getSubjects = async (req, res) => {
     try {
         const { branch, semester } = req.query;
 
-        let filteredResources = [...mockDatabase.resources];
+        const matchQuery = { isActive: true };
+        if (branch) matchQuery.branch = branch;
+        if (semester) matchQuery.semester = parseInt(semester);
 
-        if (branch) {
-            filteredResources = filteredResources.filter(
-                (r) => r.branch === branch,
-            );
-        }
-        if (semester) {
-            filteredResources = filteredResources.filter(
-                (r) => r.semester === parseInt(semester),
-            );
-        }
-
-        const subjectMap = {};
-        filteredResources.forEach((resource) => {
-            if (!subjectMap[resource.subject]) {
-                subjectMap[resource.subject] = {
-                    name: resource.subject,
-                    resourceCount: 0,
-                    branches: new Set(),
-                    semesters: new Set(),
-                    types: new Set(),
-                };
-            }
-            subjectMap[resource.subject].resourceCount++;
-            subjectMap[resource.subject].branches.add(resource.branch);
-            subjectMap[resource.subject].semesters.add(resource.semester);
-            subjectMap[resource.subject].types.add(resource.resourceType);
-        });
-
-        const subjects = Object.values(subjectMap).map((subject) => ({
-            name: subject.name,
-            resourceCount: subject.resourceCount,
-            branches: Array.from(subject.branches),
-            semesters: Array.from(subject.semesters).sort((a, b) => a - b),
-            resourceTypes: Array.from(subject.types),
-        }));
-
-        subjects.sort((a, b) => {
-            if (b.resourceCount !== a.resourceCount) {
-                return b.resourceCount - a.resourceCount;
-            }
-            return a.name.localeCompare(b.name);
-        });
+        const subjects = await Resource.aggregate([
+            { $match: matchQuery },
+            {
+                $group: {
+                    _id: "$subject",
+                    resourceCount: { $sum: 1 },
+                    branches: { $addToSet: "$branch" },
+                    semesters: { $addToSet: "$semester" },
+                    resourceTypes: { $addToSet: "$resourceType" },
+                },
+            },
+            {
+                $project: {
+                    name: "$_id",
+                    resourceCount: 1,
+                    branches: 1,
+                    semesters: {
+                        $sortArray: { input: "$semesters", sortBy: 1 },
+                    },
+                    resourceTypes: 1,
+                    _id: 0,
+                },
+            },
+            { $sort: { resourceCount: -1, name: 1 } },
+        ]);
 
         res.json({
             success: true,

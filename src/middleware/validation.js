@@ -1,6 +1,6 @@
 import { body, query, param, validationResult } from "express-validator";
 
-export const validateResourceUpload = [
+const commonValidation = [
     body("branch")
         .notEmpty()
         .withMessage("Branch is required")
@@ -14,9 +14,6 @@ export const validateResourceUpload = [
         .withMessage("Subject is required")
         .isLength({ min: 2, max: 100 })
         .withMessage("Subject must be between 2 and 100 characters"),
-    body("resourceType")
-        .isIn(["pyq", "notes", "syllabus", "content"])
-        .withMessage("Invalid resource type"),
     body("title")
         .notEmpty()
         .withMessage("Title is required")
@@ -26,22 +23,32 @@ export const validateResourceUpload = [
         .optional()
         .isLength({ max: 1000 })
         .withMessage("Description must be less than 1000 characters"),
-    body("syllabusText")
-        .if(body("resourceType").equals("syllabus"))
-        .notEmpty()
-        .withMessage("Syllabus text is required for syllabus resources")
-        .isLength({ min: 10 })
-        .withMessage("Syllabus text must be at least 10 characters"),
-    body("contentLink")
-        .if(body("resourceType").equals("content"))
-        .notEmpty()
-        .withMessage("Content link is required for content resources")
-        .isURL()
-        .withMessage("Valid URL is required for content resources"),
     body("tags")
         .optional()
         .isString()
         .withMessage("Tags must be a comma-separated string"),
+];
+
+export const validatePYQUpload = [...commonValidation];
+
+export const validateNotesUpload = [...commonValidation];
+
+export const validateSyllabusUpload = [
+    ...commonValidation,
+    body("syllabusText")
+        .notEmpty()
+        .withMessage("Syllabus text is required")
+        .isLength({ min: 10 })
+        .withMessage("Syllabus text must be at least 10 characters"),
+];
+
+export const validateContentLinkUpload = [
+    ...commonValidation,
+    body("contentLink")
+        .notEmpty()
+        .withMessage("Content link is required")
+        .isURL()
+        .withMessage("Valid URL is required for content link"),
 ];
 
 export const validateResourceQuery = [
@@ -108,12 +115,16 @@ export const validateBulkDelete = [
         .isArray({ min: 1 })
         .withMessage("Resource IDs array is required and must not be empty"),
     body("resourceIds.*")
-        .isMongoId()
-        .withMessage("Each resource ID must be a valid MongoDB ID"),
+        .isString()
+        .isLength({ min: 24, max: 24 })
+        .withMessage("Each resource ID must be a valid MongoDB ObjectId"),
 ];
 
 export const validateResourceId = [
-    param("id").isMongoId().withMessage("Invalid resource ID"),
+    param("id")
+        .isString()
+        .isLength({ min: 24, max: 24 })
+        .withMessage("Invalid resource ID format"),
 ];
 
 export const handleValidationErrors = (req, res, next) => {

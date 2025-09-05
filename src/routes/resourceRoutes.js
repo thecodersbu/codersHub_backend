@@ -1,6 +1,9 @@
 import express from "express";
 import {
-    uploadResource,
+    uploadPYQ,
+    uploadNotes,
+    uploadSyllabus,
+    uploadContentLink,
     getResources,
     getResourceById,
     downloadResource,
@@ -14,7 +17,10 @@ import {
 import upload from "../middleware/upload.js";
 import { handleMulterError } from "../middleware/upload.js";
 import {
-    validateResourceUpload,
+    validatePYQUpload,
+    validateNotesUpload,
+    validateSyllabusUpload,
+    validateContentLinkUpload,
     validateResourceQuery,
     validateResourceId,
     validateResourceSearch,
@@ -24,14 +30,40 @@ import {
 
 const router = express.Router();
 
-// Upload resource
+// Upload PYQ (Previous Year Questions) - requires file upload
 router.post(
-    "/upload",
+    "/upload/pyq",
     upload.single("file"),
     handleMulterError,
-    validateResourceUpload,
+    validatePYQUpload,
     handleValidationErrors,
-    uploadResource,
+    uploadPYQ,
+);
+
+// Upload Notes - requires file upload
+router.post(
+    "/upload/notes",
+    upload.single("file"),
+    handleMulterError,
+    validateNotesUpload,
+    handleValidationErrors,
+    uploadNotes,
+);
+
+// Upload Syllabus - text-based, no file upload
+router.post(
+    "/upload/syllabus",
+    validateSyllabusUpload,
+    handleValidationErrors,
+    uploadSyllabus,
+);
+
+// Upload Content Link - URL-based, no file upload
+router.post(
+    "/upload/content",
+    validateContentLinkUpload,
+    handleValidationErrors,
+    uploadContentLink,
 );
 
 // Get resources with filtering and pagination
