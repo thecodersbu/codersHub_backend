@@ -4,7 +4,7 @@ export const validateResourceUpload = [
     body("branch")
         .notEmpty()
         .withMessage("Branch is required")
-        .isIn(["CSE", "ECE", "ME", "CE", "EEE", "IT", "AIDS", "AIML"])
+        .isIn(["CSE", "ECE", "ME", "EIE", "BT", "BM", "FT", "IT"])
         .withMessage("Invalid branch"),
     body("semester")
         .isInt({ min: 1, max: 8 })
@@ -47,7 +47,7 @@ export const validateResourceUpload = [
 export const validateResourceQuery = [
     query("branch")
         .optional()
-        .isIn(["CSE", "ECE", "ME", "CE", "EEE", "IT", "AIDS", "AIML"])
+        .isIn(["CSE", "ECE", "ME", "EIE", "BT", "BM", "FT", "IT"])
         .withMessage("Invalid branch"),
     query("semester")
         .optional()
@@ -83,7 +83,7 @@ export const validateResourceSearch = [
         .withMessage("Search query must be between 2 and 100 characters"),
     query("branch")
         .optional()
-        .isIn(["CSE", "ECE", "ME", "CE", "EEE", "IT", "AIDS", "AIML"])
+        .isIn(["CSE", "ECE", "ME", "EIE", "BT", "BM", "FT", "IT"])
         .withMessage("Invalid branch"),
     query("semester")
         .optional()
