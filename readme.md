@@ -159,11 +159,6 @@ Create `.env` file with required variables (see `.env.example`)
 npm run dev
 ```
 
-4. **Test the API**
-```bash
-node test-api.js
-```
-
 ## 📊 Database Schema
 
 ### Resource Model
@@ -196,22 +191,3 @@ node test-api.js
 }
 ```
 
-## 🔍 Key Improvements
-
-1. **Proper MongoDB Integration**: All data now persists in MongoDB
-2. **Cloudinary Integration**: File URLs and IDs are stored after successful upload
-3. **Resource Type Separation**: Different routes for different resource types
-4. **Text-based Resources**: Syllabus and content links work without file uploads
-5. **Better Error Handling**: Comprehensive error handling and logging
-6. **Production Ready**: Proper validation, logging, and error handling
-
-## 🧪 Testing
-
-The `test-api.js` file provides basic API testing. Run it after starting the server:
-
-```bash
-npm run dev
-
-```
-
-This will test all major endpoints and verify the functionality.
