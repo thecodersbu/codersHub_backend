@@ -211,8 +211,7 @@ The `test-api.js` file provides basic API testing. Run it after starting the ser
 
 ```bash
 npm run dev
-# In another terminal:
-node test-api.js
+
 ```
 
 This will test all major endpoints and verify the functionality.
