@@ -2,14 +2,6 @@
 
 CodersHub - Centralized. Accessible. Efficient. Academic Excellence Made Simple.
 
-## 🚀 Features Fixed & Implemented
-
-### ✅ Issues Resolved:
-1. **MongoDB Integration**: Replaced mock database with actual MongoDB using Mongoose
-2. **Cloudinary URL/ID Storage**: After uploading to Cloudinary, URLs and IDs are now properly stored in MongoDB
-3. **Separate Resource Type Routes**: Created dedicated routes for different resource types
-4. **Text-based Resources**: Syllabus and Content Link uploads now work without file uploads
-
 ### 🔧 New Route Structure:
 
 #### File Upload Routes (require PDF files):
