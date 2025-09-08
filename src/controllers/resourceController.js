@@ -921,7 +921,6 @@ export const getBranches = async (req, res) => {
                 code: "EIE",
                 name: "Electronics and Instrumentation Engineering",
             },
-            { code: "IT", name: "Information Technology" },
         ];
 
         const branchCounts = await Resource.aggregate([
