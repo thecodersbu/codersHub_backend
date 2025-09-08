@@ -2,14 +2,6 @@
 
 CodersHub - Centralized. Accessible. Efficient. Academic Excellence Made Simple.
 
-## 🚀 Features Fixed & Implemented
-
-### ✅ Issues Resolved:
-1. **MongoDB Integration**: Replaced mock database with actual MongoDB using Mongoose
-2. **Cloudinary URL/ID Storage**: After uploading to Cloudinary, URLs and IDs are now properly stored in MongoDB
-3. **Separate Resource Type Routes**: Created dedicated routes for different resource types
-4. **Text-based Resources**: Syllabus and Content Link uploads now work without file uploads
-
 ### 🔧 New Route Structure:
 
 #### File Upload Routes (require PDF files):
@@ -167,11 +159,6 @@ Create `.env` file with required variables (see `.env.example`)
 npm run dev
 ```
 
-4. **Test the API**
-```bash
-node test-api.js
-```
-
 ## 📊 Database Schema
 
 ### Resource Model
@@ -204,23 +191,3 @@ node test-api.js
 }
 ```
 
-## 🔍 Key Improvements
-
-1. **Proper MongoDB Integration**: All data now persists in MongoDB
-2. **Cloudinary Integration**: File URLs and IDs are stored after successful upload
-3. **Resource Type Separation**: Different routes for different resource types
-4. **Text-based Resources**: Syllabus and content links work without file uploads
-5. **Better Error Handling**: Comprehensive error handling and logging
-6. **Production Ready**: Proper validation, logging, and error handling
-
-## 🧪 Testing
-
-The `test-api.js` file provides basic API testing. Run it after starting the server:
-
-```bash
-npm run dev
-# In another terminal:
-node test-api.js
-```
-
-This will test all major endpoints and verify the functionality.
